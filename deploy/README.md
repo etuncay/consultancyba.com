@@ -125,8 +125,9 @@ sudo nginx -t
 sudo tail -f /var/log/nginx/consultancyba.com.error.log
 sudo tail -f /var/log/nginx/consultancyba.com.access.log
 
-# PHP-FPM durumu
-sudo systemctl status php*-fpm
+# PHP-FPM durumu (Ubuntu: php8.1-fpm / php8.3-fpm — php-fpm.service yoktur)
+systemctl list-unit-files 'php*-fpm.service'
+sudo systemctl status php8.3-fpm   # sürüme göre değiştirin
 ls /run/php/
 
 # İletişim formu 502 veriyorsa PHP-FPM socket yolunu kontrol et

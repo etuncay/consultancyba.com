@@ -17,9 +17,27 @@ echo "==> Paketler kuruluyor..."
 apt update
 apt install -y nginx git php-fpm php-cli php-mbstring
 
-PHP_FPM_SOCK="$(find /run/php /var/run/php -name 'php*-fpm.sock' 2>/dev/null | head -1 || true)"
+PHP_FPM_SERVICE=""
+while IFS= read -r unit; do
+  PHP_FPM_SERVICE="${unit%.service}"
+  break
+done < <(systemctl list-unit-files --no-legend 'php*-fpm.service' 2>/dev/null | awk '{print $1}')
+
+if [[ -z "${PHP_FPM_SERVICE}" ]]; then
+  echo "HATA: php*-fpm systemd birimi bulunamadı."
+  exit 1
+fi
+
+echo "==> PHP-FPM etkinleştiriliyor: ${PHP_FPM_SERVICE}"
+systemctl enable "${PHP_FPM_SERVICE}"
+systemctl restart "${PHP_FPM_SERVICE}"
+
+PHP_FPM_SOCK="$(find /run/php /var/run/php -name "${PHP_FPM_SERVICE}.sock" 2>/dev/null | head -1 || true)"
 if [[ -z "${PHP_FPM_SOCK}" ]]; then
-  echo "HATA: PHP-FPM socket bulunamadı. php-fpm servisini kontrol edin."
+  PHP_FPM_SOCK="$(find /run/php /var/run/php -name 'php*-fpm.sock' 2>/dev/null | head -1 || true)"
+fi
+if [[ -z "${PHP_FPM_SOCK}" ]]; then
+  echo "HATA: PHP-FPM socket bulunamadı (${PHP_FPM_SERVICE})."
   exit 1
 fi
 
@@ -50,10 +68,6 @@ sed -i "s|__PHP_FPM_SOCK__|${PHP_FPM_SOCK}|g" "${NGINX_AVAILABLE}"
 ln -sf "${NGINX_AVAILABLE}" "${NGINX_ENABLED}"
 rm -f /etc/nginx/sites-enabled/default
 
-echo "==> PHP-FPM etkinleştiriliyor..."
-systemctl enable php-fpm
-systemctl restart php-fpm
-
 echo "==> nginx test..."
 nginx -t
 
@@ -65,6 +79,7 @@ echo ""
 echo "Kurulum tamamlandı."
 echo "  Site kökü     : ${SITE_ROOT}"
 echo "  Config        : ${NGINX_AVAILABLE}"
+echo "  PHP-FPM       : ${PHP_FPM_SERVICE}"
 echo "  PHP-FPM socket: ${PHP_FPM_SOCK}"
 echo ""
 echo "Test: http://$(hostname -I | awk '{print $1}')/"
